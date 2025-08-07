@@ -1,0 +1,269 @@
+use anyhow::Result;
+use clap::{Arg, Command};
+use crossterm::{
+    event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use dirs::home_dir;
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    env,
+    fs,
+    io::{self, Write},
+    path::PathBuf,
+    process::Stdio,
+};
+use tokio::process::Command as TokioCommand;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ClaudeSettings {
+    #[serde(flatten)]
+    settings: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ClaudeCodeRouterConfig {
+    #[serde(flatten)]
+    config: HashMap<String, serde_json::Value>,
+}
+
+#[derive(Debug)]
+struct ConfigItem {
+    name: String,
+    path: PathBuf,
+    config_type: ConfigType,
+}
+
+#[derive(Debug)]
+enum ConfigType {
+    Claude,
+    CodeRouter,
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let matches = Command::new("claude-codust")
+        .version("0.1.0")
+        .about("Claude Code configuration switcher")
+        .arg(
+            Arg::new("code")
+                .long("code")
+                .help("Show interactive configuration selector")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .get_matches();
+
+    if matches.get_flag("code") {
+        show_interactive_selector().await?;
+    } else {
+        println!("Use --code to show interactive configuration selector");
+    }
+
+    Ok(())
+}
+
+async fn show_interactive_selector() -> Result<()> {
+    let configs = load_configurations()?;
+    
+    if configs.is_empty() {
+        println!("No configuration files found in ~/.claude/ or ~/.claude-code-router/");
+        return Ok(());
+    }
+
+    enable_raw_mode()?;
+    execute!(io::stdout(), EnterAlternateScreen)?;
+
+    let result = run_selector(&configs).await;
+
+    disable_raw_mode()?;
+    execute!(io::stdout(), LeaveAlternateScreen)?;
+
+    result
+}
+
+async fn run_selector(configs: &[ConfigItem]) -> Result<()> {
+    let mut selected = 0;
+
+    loop {
+        print_selector_ui(configs, selected)?;
+
+        if let Event::Key(KeyEvent {
+            code,
+            kind: KeyEventKind::Press,
+            ..
+        }) = event::read()?
+        {
+            match code {
+                KeyCode::Up => {
+                    if selected > 0 {
+                        selected -= 1;
+                    }
+                }
+                KeyCode::Down => {
+                    if selected < configs.len() - 1 {
+                        selected += 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    switch_configuration(&configs[selected]).await?;
+                    return Ok(());
+                }
+                KeyCode::Esc | KeyCode::Char('q') => {
+                    println!("\r\nCancelled");
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
+    }
+}
+
+fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
+    execute!(io::stdout(), crossterm::terminal::Clear(crossterm::terminal::ClearType::All))?;
+    execute!(io::stdout(), crossterm::cursor::MoveTo(0, 0))?;
+
+    println!("\r\n Claude Code Configuration Selector\r\n");
+    println!("\r Use ↑/↓ to navigate, Enter to select, Esc/q to quit\r\n");
+
+    for (i, config) in configs.iter().enumerate() {
+        let prefix = if i == selected { "❯ " } else { "  " };
+        let type_indicator = match config.config_type {
+            ConfigType::Claude => "[Claude]",
+            ConfigType::CodeRouter => "[CCR]",
+        };
+        println!("\r{}{} {} {}", prefix, config.name, type_indicator, config.path.display());
+    }
+
+    io::stdout().flush()?;
+    Ok(())
+}
+
+fn load_configurations() -> Result<Vec<ConfigItem>> {
+    let mut configs = Vec::new();
+    let home = home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
+
+    let claude_dir = home.join(".claude");
+    if claude_dir.exists() {
+        for entry in fs::read_dir(&claude_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                if file_name.ends_with("-settings.json") {
+                    let name = file_name.strip_suffix("-settings.json").unwrap().to_string();
+                    configs.push(ConfigItem {
+                        name,
+                        path,
+                        config_type: ConfigType::Claude,
+                    });
+                }
+            }
+        }
+    }
+
+    let router_dir = home.join(".claude-code-router");
+    if router_dir.exists() {
+        for entry in fs::read_dir(&router_dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                if file_name.ends_with("-config.json") {
+                    let base_name = file_name.strip_suffix("-config.json").unwrap();
+                    let name = format!("{}-ccr", base_name);
+                    configs.push(ConfigItem {
+                        name,
+                        path,
+                        config_type: ConfigType::CodeRouter,
+                    });
+                }
+            }
+        }
+    }
+
+    configs.sort_by(|a, b| a.name.cmp(&b.name));
+    Ok(configs)
+}
+
+async fn switch_configuration(config: &ConfigItem) -> Result<()> {
+    let home = home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
+    
+    match config.config_type {
+        ConfigType::Claude => {
+            //let target_path = home.join(".claude").join("settings.json");
+            //fs::copy(&config.path, &target_path)?;
+            println!("\r\nSwitched to Claude configuration: {}", config.name);
+            //println!("\r\nCopied {} to {}", config.path.display(), target_path.display());
+            
+            // Launch claude command with environment variables from config
+            launch_claude_with_config(&config.path).await?;
+        }
+        ConfigType::CodeRouter => {
+            let target_path = home.join(".claude-code-router").join("config.json");
+            
+            if let Some(parent) = target_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            
+            fs::copy(&config.path, &target_path)?;
+            println!("\r\nSwitched to Claude Code Router configuration: {}", config.name);
+            println!("\r\nCopied {} to {}", config.path.display(), target_path.display());
+        }
+    }
+    
+    Ok(())
+}
+
+async fn launch_claude_with_config(config_path: &PathBuf) -> Result<()> {
+    // Read and parse the configuration file
+    let config_content = fs::read_to_string(config_path)?;
+    let config: serde_json::Value = serde_json::from_str(&config_content)?;
+    
+    // Extract environment variables from the config
+    let mut env_vars = env::vars().collect::<HashMap<String, String>>();
+    
+    if let Some(env_obj) = config.get("env").and_then(|e| e.as_object()) {
+        for (key, value) in env_obj {
+            if let Some(value_str) = value.as_str() {
+                env_vars.insert(key.clone(), value_str.to_string());
+            }
+        }
+    }
+    
+    // Find claude command path
+    let claude_path = find_claude_command()?;
+    
+    println!("\r\nLaunching Claude with configuration environment...");
+    
+    // Launch claude command with environment variables
+    let mut child = TokioCommand::new("cmd")
+        .args(["/C", &claude_path])
+        .envs(&env_vars)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()?;
+    
+    let status = child.wait().await?;
+    
+    if !status.success() {
+        println!("\r\nClaude command exited with status: {}", status);
+    }
+    
+    Ok(())
+}
+
+fn find_claude_command() -> Result<String> {
+    // Try to find claude in PATH
+    if let Ok(output) = std::process::Command::new("where").arg("claude").output() {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return Ok(path);
+            }
+        }
+    }
+    
+    // Fallback to just "claude" and let the shell find it
+    Ok("claude".to_string())
+}
