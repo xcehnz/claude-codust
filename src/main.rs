@@ -130,7 +130,7 @@ fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
     for (i, config) in configs.iter().enumerate() {
         let prefix = if i == selected { "❯ " } else { "  " };
         let type_indicator = match config.config_type {
-            ConfigType::Claude => "[Claude]",
+            ConfigType::Claude => "",
             ConfigType::CodeRouter => "[CCR]",
         };
         println!("\r{}{} {} {}", prefix, config.name, type_indicator, config.path.display());
@@ -269,14 +269,24 @@ async fn launch_claude_with_config(config_path: &PathBuf, config_type: &ConfigTy
     
     println!("\r\nLaunching Claude with configuration environment...");
     
-    // Launch claude command with environment variables
-    let mut child = TokioCommand::new("cmd")
-        .args(["/C", &claude_path])
-        .envs(&env_vars)
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()?;
+    // Launch claude command with environment variables (cross-platform)
+    let mut child = if cfg!(target_os = "windows") {
+        TokioCommand::new("cmd")
+            .args(["/C", &claude_path])
+            .envs(&env_vars)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()?
+    } else {
+        TokioCommand::new("sh")
+            .args(["-c", &claude_path])
+            .envs(&env_vars)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()?
+    };
     
     let status = child.wait().await?;
     
@@ -288,8 +298,9 @@ async fn launch_claude_with_config(config_path: &PathBuf, config_type: &ConfigTy
 }
 
 fn find_claude_command() -> Result<String> {
-    // Try to find claude in PATH
-    if let Ok(output) = std::process::Command::new("where").arg("claude").output() {
+    let which_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+    
+    if let Ok(output) = std::process::Command::new(which_cmd).arg("claude").output() {
         if output.status.success() {
             let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if !path.is_empty() {
@@ -298,19 +309,27 @@ fn find_claude_command() -> Result<String> {
         }
     }
     
-    // Fallback to just "claude" and let the shell find it
     Ok("claude".to_string())
 }
 
 async fn run_ccr_restart() -> Result<()> {
     println!("\r\nRunning ccr restart...");
     
-    let mut child = TokioCommand::new("cmd")
-        .args(["/C", "ccr", "restart"])
-        .stdin(Stdio::inherit())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()?;
+    let mut child = if cfg!(target_os = "windows") {
+        TokioCommand::new("cmd")
+            .args(["/C", "ccr", "restart"])
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()?
+    } else {
+        TokioCommand::new("sh")
+            .args(["-c", "ccr restart"])
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .spawn()?
+    };
     
     let status = child.wait().await?;
     
