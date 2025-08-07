@@ -195,7 +195,7 @@ async fn switch_configuration(config: &ConfigItem) -> Result<()> {
             println!("\r\nSwitched to Claude configuration: {}", config.name);
             //println!("\r\nCopied {} to {}", config.path.display(), target_path.display());
             
-            // Launch claude command with environment variables from config
+            // Launch claude command with original config env variables
             launch_claude_with_config(&config.path).await?;
         }
         ConfigType::CodeRouter => {
@@ -208,6 +208,12 @@ async fn switch_configuration(config: &ConfigItem) -> Result<()> {
             fs::copy(&config.path, &target_path)?;
             println!("\r\nSwitched to Claude Code Router configuration: {}", config.name);
             println!("\r\nCopied {} to {}", config.path.display(), target_path.display());
+            
+            // Run ccr restart command
+            run_ccr_restart().await?;
+            
+            // Launch claude command with environment variables from config
+            launch_claude_with_config(&target_path).await?;
         }
     }
     
@@ -222,6 +228,19 @@ async fn launch_claude_with_config(config_path: &PathBuf) -> Result<()> {
     // Extract environment variables from the config
     let mut env_vars = env::vars().collect::<HashMap<String, String>>();
     
+    // Set ANTHROPIC_API_KEY from config.APIKEY
+    if let Some(api_key) = config.get("APIKEY").and_then(|k| k.as_str()) {
+        env_vars.insert("ANTHROPIC_API_KEY".to_string(), api_key.to_string());
+    }
+    
+    // Set ANTHROPIC_BASE_URL from config.PORT (default 3456)
+    let port = config.get("PORT")
+        .and_then(|p| p.as_str())
+        .unwrap_or("3456");
+    let base_url = format!("http://127.0.0.1:{}", port);
+    env_vars.insert("ANTHROPIC_BASE_URL".to_string(), base_url);
+    
+    // Also include any additional env variables from config.env if present
     if let Some(env_obj) = config.get("env").and_then(|e| e.as_object()) {
         for (key, value) in env_obj {
             if let Some(value_str) = value.as_str() {
@@ -266,4 +285,25 @@ fn find_claude_command() -> Result<String> {
     
     // Fallback to just "claude" and let the shell find it
     Ok("claude".to_string())
+}
+
+async fn run_ccr_restart() -> Result<()> {
+    println!("\r\nRunning ccr restart...");
+    
+    let mut child = TokioCommand::new("cmd")
+        .args(["/C", "ccr", "restart"])
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()?;
+    
+    let status = child.wait().await?;
+    
+    if !status.success() {
+        println!("\r\nWarning: ccr restart command exited with status: {}", status);
+    } else {
+        println!("\r\nccr restart completed successfully");
+    }
+    
+    Ok(())
 }
