@@ -120,6 +120,13 @@ async fn run_selector(configs: &[ConfigItem]) -> Result<()> {
     }
 }
 
+fn get_type_indicator(config_type: &ConfigType) -> &'static str {
+    match config_type {
+        ConfigType::Claude => "",
+        ConfigType::CodeRouter => " [CCR]",
+    }
+}
+
 fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
     execute!(io::stdout(), crossterm::terminal::Clear(crossterm::terminal::ClearType::All))?;
     execute!(io::stdout(), crossterm::cursor::MoveTo(0, 0))?;
@@ -129,22 +136,13 @@ fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
 
     // Calculate max name length for alignment
     let max_name_len = configs.iter()
-        .map(|c| {
-            let indicator = match c.config_type {
-                ConfigType::Claude => "",
-                ConfigType::CodeRouter => " [CCR]",
-            };
-            c.name.len() + indicator.len()
-        })
+        .map(|c| c.name.len() + get_type_indicator(&c.config_type).len())
         .max()
         .unwrap_or(0);
 
     for (i, config) in configs.iter().enumerate() {
         let prefix = if i == selected { "❯ " } else { "  " };
-        let type_indicator = match config.config_type {
-            ConfigType::Claude => "",
-            ConfigType::CodeRouter => " [CCR]",
-        };
+        let type_indicator = get_type_indicator(&config.config_type);
         let name_with_indicator = format!("{}{}", config.name, type_indicator);
         println!("\r{}{:<width$} {}", prefix, name_with_indicator, config.path.display(), width = max_name_len);
     }
