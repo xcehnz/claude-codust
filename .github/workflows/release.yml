@@ -18,19 +18,19 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: claude-codust-windows-x64.exe
+            binary_name: claude-codust.exe
             asset_name: claude-codust-windows-x64.exe
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: claude-codust-linux-x64
+            binary_name: claude-codust
             asset_name: claude-codust-linux-x64
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: claude-codust-macos-x64
+            binary_name: claude-codust
             asset_name: claude-codust-macos-x64
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: claude-codust-macos-arm64
+            binary_name: claude-codust
             asset_name: claude-codust-macos-arm64
 
     steps:
@@ -63,11 +63,23 @@ jobs:
       - name: Build binary
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Prepare binary
+        shell: bash
+        run: |
+          mkdir -p release
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "release/${{ matrix.asset_name }}"
+          else
+            cp "target/${{ matrix.target }}/release/${{ matrix.binary_name }}" "release/${{ matrix.asset_name }}"
+            chmod +x "release/${{ matrix.asset_name }}"
+          fi
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+          path: release/${{ matrix.asset_name }}
+          retention-days: 1
 
   release:
     name: Create Release
@@ -82,14 +94,26 @@ jobs:
         with:
           path: artifacts
 
+      - name: List artifacts (debug)
+        run: |
+          echo "Artifacts directory structure:"
+          find artifacts -type f -name "*" | sort
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          # Copy all downloaded artifacts to release-assets directory
+          find artifacts -name "*claude-codust*" -type f -exec cp {} release-assets/ \;
+          echo "Release assets:"
+          ls -la release-assets/
+
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/claude-codust-windows-x64.exe/*
-            artifacts/claude-codust-linux-x64/*
-            artifacts/claude-codust-macos-x64/*
-            artifacts/claude-codust-macos-arm64/*
+          files: release-assets/*
           name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
