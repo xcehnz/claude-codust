@@ -196,7 +196,7 @@ async fn switch_configuration(config: &ConfigItem) -> Result<()> {
             //println!("\r\nCopied {} to {}", config.path.display(), target_path.display());
             
             // Launch claude command with original config env variables
-            launch_claude_with_config(&config.path).await?;
+            launch_claude_with_config(&config.path, &config.config_type).await?;
         }
         ConfigType::CodeRouter => {
             let target_path = home.join(".claude-code-router").join("config.json");
@@ -213,14 +213,14 @@ async fn switch_configuration(config: &ConfigItem) -> Result<()> {
             run_ccr_restart().await?;
             
             // Launch claude command with environment variables from config
-            launch_claude_with_config(&target_path).await?;
+            launch_claude_with_config(&target_path, &config.config_type).await?;
         }
     }
     
     Ok(())
 }
 
-async fn launch_claude_with_config(config_path: &PathBuf) -> Result<()> {
+async fn launch_claude_with_config(config_path: &PathBuf, config_type: &ConfigType) -> Result<()> {
     // Read and parse the configuration file
     let config_content = fs::read_to_string(config_path)?;
     let config: serde_json::Value = serde_json::from_str(&config_content)?;
@@ -228,24 +228,39 @@ async fn launch_claude_with_config(config_path: &PathBuf) -> Result<()> {
     // Extract environment variables from the config
     let mut env_vars = env::vars().collect::<HashMap<String, String>>();
     
-    // Set ANTHROPIC_API_KEY from config.APIKEY
-    if let Some(api_key) = config.get("APIKEY").and_then(|k| k.as_str()) {
-        env_vars.insert("ANTHROPIC_API_KEY".to_string(), api_key.to_string());
-    }
-    
-    // Set ANTHROPIC_BASE_URL from config.PORT (default 3456)
-    let port = config.get("PORT")
-        .and_then(|p| p.as_str())
-        .unwrap_or("3456");
-    let base_url = format!("http://127.0.0.1:{}", port);
-    env_vars.insert("ANTHROPIC_BASE_URL".to_string(), base_url);
-    
-    // Also include any additional env variables from config.env if present
-    if let Some(env_obj) = config.get("env").and_then(|e| e.as_object()) {
-        for (key, value) in env_obj {
-            if let Some(value_str) = value.as_str() {
-                env_vars.insert(key.clone(), value_str.to_string());
+    match config_type {
+        ConfigType::Claude => {
+            // For .claude configs, only use env variables from config.env if present
+            if let Some(env_obj) = config.get("env").and_then(|e| e.as_object()) {
+                for (key, value) in env_obj {
+                    if let Some(value_str) = value.as_str() {
+                        env_vars.insert(key.clone(), value_str.to_string());
+                    }
+                }
             }
+        }
+        ConfigType::CodeRouter => {
+            // For .claude-code-router configs, set ANTHROPIC_API_KEY/AUTH_TOKEN and BASE_URL
+            if let Some(api_key) = config.get("APIKEY").and_then(|k| k.as_str()) {
+                env_vars.insert("ANTHROPIC_API_KEY".to_string(), api_key.to_string());
+            } else {
+                env_vars.insert("ANTHROPIC_AUTH_TOKEN".to_string(), "test".to_string());
+            }
+            
+            let port = config.get("PORT")
+                .and_then(|p| p.as_str())
+                .unwrap_or("3456");
+            let base_url = format!("http://127.0.0.1:{}", port);
+            env_vars.insert("ANTHROPIC_BASE_URL".to_string(), base_url);
+            
+            // Also include any additional env variables from config.env if present
+            // if let Some(env_obj) = config.get("env").and_then(|e| e.as_object()) {
+            //     for (key, value) in env_obj {
+            //         if let Some(value_str) = value.as_str() {
+            //             env_vars.insert(key.clone(), value_str.to_string());
+            //         }
+            //     }
+            // }
         }
     }
     
