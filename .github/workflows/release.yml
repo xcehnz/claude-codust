@@ -18,19 +18,19 @@ jobs:
         include:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: claude-codust.exe
+            artifact_name: claude-codust-windows-x64.exe
             asset_name: claude-codust-windows-x64.exe
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: claude-codust
+            artifact_name: claude-codust-linux-x64
             asset_name: claude-codust-linux-x64
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: claude-codust
+            artifact_name: claude-codust-macos-x64
             asset_name: claude-codust-macos-x64
           - os: macos-latest
             target: aarch64-apple-darwin
-            artifact_name: claude-codust
+            artifact_name: claude-codust-macos-arm64
             asset_name: claude-codust-macos-arm64
 
     steps:
