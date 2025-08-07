@@ -127,13 +127,26 @@ fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
     println!("\r\n Claude Code Configuration Selector\r\n");
     println!("\r Use ↑/↓ to navigate, Enter to select, Esc/q to quit\r\n");
 
+    // Calculate max name length for alignment
+    let max_name_len = configs.iter()
+        .map(|c| {
+            let indicator = match c.config_type {
+                ConfigType::Claude => "",
+                ConfigType::CodeRouter => " [CCR]",
+            };
+            c.name.len() + indicator.len()
+        })
+        .max()
+        .unwrap_or(0);
+
     for (i, config) in configs.iter().enumerate() {
         let prefix = if i == selected { "❯ " } else { "  " };
         let type_indicator = match config.config_type {
             ConfigType::Claude => "",
-            ConfigType::CodeRouter => "[CCR]",
+            ConfigType::CodeRouter => " [CCR]",
         };
-        println!("\r{}{} {} {}", prefix, config.name, type_indicator, config.path.display());
+        let name_with_indicator = format!("{}{}", config.name, type_indicator);
+        println!("\r{}{:<width$} {}", prefix, name_with_indicator, config.path.display(), width = max_name_len);
     }
 
     io::stdout().flush()?;
