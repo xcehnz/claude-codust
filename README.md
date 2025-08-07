@@ -47,6 +47,23 @@ This will display an interactive interface where you can:
 - Press Enter to select a configuration
 - Press Esc or 'q' to quit
 
+Example output:
+
+```
+ Claude Code Configuration Selector
+
+ Use ↑/↓ to navigate, Enter to select, Esc/q to quit
+
+❯ anyrouter        C:\Users\user\.claude\anyrouter-settings.json
+  gemini-ccr [CCR] C:\Users\user\.claude-code-router\gemini-config.json
+  k2               C:\Users\user\.claude\k2-settings.json
+  openai-ccr [CCR] C:\Users\user\.claude-code-router\openai-config.json
+  inst2api         C:\Users\user\.claude\inst-settings.json
+  qwencoder3       C:\Users\user\.claude\qwencoder3-settings.json
+```
+
+
+
 ### Configuration File Structure
 
 The tool looks for configuration files in two directories:
