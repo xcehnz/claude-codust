@@ -14,7 +14,7 @@ A cross-platform command-line tool for switching Claude Code and Claude Code Rou
 
 ### Pre-built Binaries
 
-Download the latest release for your platform from [GitHub Releases](https://github.com/your-username/claude-codust/releases):
+Download the latest release for your platform from [GitHub Releases](https://github.com/xcehnz/claude-codust/releases):
 
 - **Windows x64**: `claude-codust-windows-x64.exe`
 - **Linux x64**: `claude-codust-linux-x64`
@@ -25,7 +25,7 @@ Download the latest release for your platform from [GitHub Releases](https://git
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/claude-codust.git
+git clone https://github.com/xcehnz/claude-codust.git
 cd claude-codust
 
 # Build the project
@@ -39,7 +39,7 @@ cargo build --release
 ### Interactive Configuration Selector
 
 ```bash
-claude-codust --code
+claude-codust code
 ```
 
 This will display an interactive interface where you can:

@@ -1,7 +1,13 @@
 [package]
 name = "claude-codust"
-version = "0.1.0"
+version = "0.0.3"
 edition = "2021"
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }

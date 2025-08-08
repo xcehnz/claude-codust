@@ -49,16 +49,16 @@ async fn main() -> Result<()> {
         .about("Claude Code configuration switcher")
         .arg(
             Arg::new("code")
-                .long("code")
                 .help("Show interactive configuration selector")
-                .action(clap::ArgAction::SetTrue),
+                .action(clap::ArgAction::Set)
+                .required(false),
         )
         .get_matches();
 
-    if matches.get_flag("code") {
+    if matches.contains_id("code") {
         show_interactive_selector().await?;
     } else {
-        println!("Use --code to show interactive configuration selector");
+        println!("Use 'code' to show interactive configuration selector");
     }
 
     Ok(())
