@@ -45,7 +45,7 @@ enum ConfigType {
 #[tokio::main]
 async fn main() -> Result<()> {
     let matches = Command::new("claude-codust")
-        .version("0.1.0")
+        .version("0.0.3")
         .about("Claude Code configuration switcher")
         .arg(
             Arg::new("code")
@@ -299,10 +299,21 @@ async fn launch_claude_with_config(config_path: &PathBuf, config_type: &ConfigTy
             .spawn()?
     };
     
-    let status = child.wait().await?;
-    
-    if !status.success() {
-        println!("\r\nClaude command exited with status: {}", status);
+    // Handle process exit and cleanup for CodeRouter configs
+    if matches!(config_type, ConfigType::CodeRouter) {
+        let status = child.wait().await?;
+        
+        // Always stop CCR when claude process exits (regardless of exit reason)
+        let _ = stop_ccr().await;
+        
+        if !status.success() {
+            println!("\r\nClaude command exited with status: {}", status);
+        }
+    } else {
+        let status = child.wait().await?;
+        if !status.success() {
+            println!("\r\nClaude command exited with status: {}", status);
+        }
     }
     
     Ok(())
@@ -348,6 +359,36 @@ async fn run_ccr_restart() -> Result<()> {
         println!("\r\nWarning: ccr restart command exited with status: {}", status);
     } else {
         println!("\r\nccr restart completed successfully");
+    }
+    
+    Ok(())
+}
+
+async fn stop_ccr() -> Result<()> {
+    println!("\r\nStopping CCR...");
+    
+    let mut child = if cfg!(target_os = "windows") {
+        TokioCommand::new("cmd")
+            .args(["/C", "ccr", "stop"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?
+    } else {
+        TokioCommand::new("sh")
+            .args(["-c", "ccr stop"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()?
+    };
+    
+    let status = child.wait().await?;
+    
+    if status.success() {
+        println!("\r\nCCR stopped successfully");
+    } else {
+        println!("\r\nWarning: CCR stop command exited with status: {}", status);
     }
     
     Ok(())

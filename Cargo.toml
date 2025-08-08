@@ -16,4 +16,4 @@ serde_json = "1.0"
 crossterm = "0.27"
 dirs = "5.0"
 anyhow = "1.0"
-tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros"] }
+tokio = { version = "1.0", features = ["process", "rt-multi-thread", "macros", "signal"] }
