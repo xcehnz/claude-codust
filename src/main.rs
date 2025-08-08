@@ -45,7 +45,7 @@ enum ConfigType {
 #[tokio::main]
 async fn main() -> Result<()> {
     let matches = Command::new("claude-codust")
-        .version("0.0.3")
+        .version(env!("CARGO_PKG_VERSION"))
         .about("Claude Code configuration switcher")
         .arg(
             Arg::new("code")
