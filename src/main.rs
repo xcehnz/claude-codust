@@ -97,12 +97,16 @@ async fn run_selector(configs: &[ConfigItem]) -> Result<()> {
         {
             match code {
                 KeyCode::Up => {
-                    if selected > 0 {
+                    if selected == 0 {
+                        selected = configs.len() - 1;
+                    } else {
                         selected -= 1;
                     }
                 }
                 KeyCode::Down => {
-                    if selected < configs.len() - 1 {
+                    if selected == configs.len() - 1 {
+                        selected = 0;
+                    } else {
                         selected += 1;
                     }
                 }
