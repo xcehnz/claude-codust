@@ -128,11 +128,13 @@ fn get_type_indicator(config_type: &ConfigType) -> &'static str {
 }
 
 fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
-    execute!(io::stdout(), crossterm::terminal::Clear(crossterm::terminal::ClearType::All))?;
+    // Move cursor to top and clear from cursor down
     execute!(io::stdout(), crossterm::cursor::MoveTo(0, 0))?;
+    execute!(io::stdout(), crossterm::terminal::Clear(crossterm::terminal::ClearType::FromCursorDown))?;
 
-    println!("\r\n Claude Code Configuration Selector\r\n");
-    println!("\r Use ↑/↓ to navigate, Enter to select, Esc/q to quit\r\n");
+    println!(" Claude Code Configuration Selector");
+    println!(" Use ↑/↓ to navigate, Enter to select, Esc/q to quit");
+    println!();
 
     // Calculate max name length for alignment
     let max_name_len = configs.iter()
@@ -144,7 +146,7 @@ fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
         let prefix = if i == selected { "❯ " } else { "  " };
         let type_indicator = get_type_indicator(&config.config_type);
         let name_with_indicator = format!("{}{}", config.name, type_indicator);
-        println!("\r{}{:<width$} {}", prefix, name_with_indicator, config.path.display(), width = max_name_len);
+        println!("{}{:<width$} {}", prefix, name_with_indicator, config.path.display(), width = max_name_len);
     }
 
     io::stdout().flush()?;
