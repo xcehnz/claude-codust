@@ -1,6 +1,7 @@
 use anyhow::Result;
 use clap::{Arg, Command};
 use crossterm::{
+    cursor::{Hide, Show},
     event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
@@ -73,12 +74,12 @@ async fn show_interactive_selector() -> Result<()> {
     }
 
     enable_raw_mode()?;
-    execute!(io::stdout(), EnterAlternateScreen)?;
+    execute!(io::stdout(), EnterAlternateScreen, Hide)?;
 
     let result = run_selector(&configs).await;
 
+    execute!(io::stdout(), Show, LeaveAlternateScreen)?;
     disable_raw_mode()?;
-    execute!(io::stdout(), LeaveAlternateScreen)?;
 
     result
 }
