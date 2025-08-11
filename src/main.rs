@@ -286,6 +286,10 @@ async fn launch_claude_with_config(config_path: &PathBuf, config_type: &ConfigTy
     
     println!("\r\nLaunching Claude with configuration environment...");
     
+    // Leave alternate screen mode before launching claude
+    execute!(io::stdout(), LeaveAlternateScreen)?;
+    disable_raw_mode()?;
+    
     // Launch claude command with environment variables (cross-platform)
     let mut child = if cfg!(target_os = "windows") {
         TokioCommand::new("cmd")
@@ -313,14 +317,30 @@ async fn launch_claude_with_config(config_path: &PathBuf, config_type: &ConfigTy
         let _ = stop_ccr().await;
         
         if !status.success() {
-            println!("\r\nClaude command exited with status: {}", status);
+            eprintln!("Claude command exited with status: {}", status);
         }
     } else {
         let status = child.wait().await?;
         if !status.success() {
-            println!("\r\nClaude command exited with status: {}", status);
+            eprintln!("Claude command exited with status: {}", status);
         }
     }
+    
+    // Re-enter alternate screen and show completion message briefly
+    enable_raw_mode()?;
+    execute!(io::stdout(), EnterAlternateScreen)?;
+    
+    println!("\n\nClaude session completed. Press any key to exit...");
+    
+    // Wait for user input before fully exiting
+    loop {
+        if let Event::Key(_) = event::read()? {
+            break;
+        }
+    }
+    
+    disable_raw_mode()?;
+    execute!(io::stdout(), LeaveAlternateScreen)?;
     
     Ok(())
 }
