@@ -199,7 +199,13 @@ fn load_configurations() -> Result<Vec<ConfigItem>> {
         }
     }
 
-    configs.sort_by(|a, b| a.name.cmp(&b.name));
+    configs.sort_by(|a, b| {
+        match (&a.config_type, &b.config_type) {
+            (ConfigType::Claude, ConfigType::CodeRouter) => std::cmp::Ordering::Less,
+            (ConfigType::CodeRouter, ConfigType::Claude) => std::cmp::Ordering::Greater,
+            _ => a.name.cmp(&b.name),
+        }
+    });
     Ok(configs)
 }
 
@@ -208,6 +214,9 @@ async fn switch_configuration(config: &ConfigItem) -> Result<()> {
     
     match config.config_type {
         ConfigType::Claude => {
+            // Backup existing settings.json if it exists when switching to non-CCR config
+            backup_settings_json_if_exists(&home)?;
+            
             //let target_path = home.join(".claude").join("settings.json");
             //fs::copy(&config.path, &target_path)?;
             println!("\r\nSwitched to Claude configuration: {}", config.name);
@@ -285,11 +294,12 @@ async fn launch_claude_with_config(config_path: &PathBuf, config_type: &ConfigTy
     // Find claude command path
     let claude_path = find_claude_command()?;
     
-    println!("\r\nLaunching Claude with configuration environment...");
-    
-    // Leave alternate screen mode before launching claude
-    execute!(io::stdout(), LeaveAlternateScreen)?;
+    // Leave alternate screen mode and restore terminal before launching claude
+    execute!(io::stdout(), Show, LeaveAlternateScreen)?;
     disable_raw_mode()?;
+    
+    // Clear any remaining output and provide a clean transition
+    println!("Launching Claude with configuration environment...");
     
     // Launch claude command with environment variables (cross-platform)
     let mut child = if cfg!(target_os = "windows") {
@@ -327,21 +337,17 @@ async fn launch_claude_with_config(config_path: &PathBuf, config_type: &ConfigTy
         }
     }
     
-    // Re-enter alternate screen and show completion message briefly
+    // Show completion message in normal terminal mode
+    println!("\nClaude session completed. Press any key to exit...");
+    
+    // Enable raw mode temporarily just for key input
     enable_raw_mode()?;
-    execute!(io::stdout(), EnterAlternateScreen)?;
-    
-    println!("\n\nClaude session completed. Press any key to exit...");
-    
-    // Wait for user input before fully exiting
     loop {
         if let Event::Key(_) = event::read()? {
             break;
         }
     }
-    
     disable_raw_mode()?;
-    execute!(io::stdout(), LeaveAlternateScreen)?;
     
     Ok(())
 }
@@ -416,6 +422,19 @@ async fn stop_ccr() -> Result<()> {
         println!("\r\nCCR stopped successfully");
     } else {
         println!("\r\nWarning: CCR stop command exited with status: {}", status);
+    }
+    
+    Ok(())
+}
+
+fn backup_settings_json_if_exists(home: &PathBuf) -> Result<()> {
+    let claude_dir = home.join(".claude");
+    let settings_path = claude_dir.join("settings.json");
+    
+    if settings_path.exists() {
+        let backup_path = claude_dir.join("settings.json.bak");
+        fs::rename(&settings_path, &backup_path)?;
+        println!("\r\nBacked up existing settings.json to settings.json.bak");
     }
     
     Ok(())
