@@ -93,9 +93,20 @@ pub fn backup_settings_json_if_exists(home: &PathBuf) -> Result<()> {
     let settings_path = claude_dir.join("settings.json");
 
     if settings_path.exists() {
-        let backup_path = claude_dir.join("settings.json.bak");
-        fs::rename(&settings_path, &backup_path)?;
-        println!("\r\nBacked up existing settings.json to settings.json.bak");
+        let content = fs::read_to_string(&settings_path)?;
+        let mut config: serde_json::Value = serde_json::from_str(&content)?;
+        
+        // Check if config has env key and remove it
+        if config.get("env").is_some() {
+            if let Some(obj) = config.as_object_mut() {
+                obj.remove("env");
+                println!("\r\nRemoved 'env' key from existing settings.json");
+                
+                // Write back the modified config
+                let updated_content = serde_json::to_string_pretty(&config)?;
+                fs::write(&settings_path, updated_content)?;
+            }
+        }
     }
     
     Ok(())
