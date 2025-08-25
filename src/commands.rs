@@ -22,7 +22,7 @@ pub async fn switch_configuration(config: &ConfigItem) -> Result<()> {
     
     match config.config_type {
         ConfigType::Claude => {
-            crate::config::backup_settings_json_if_exists(&home)?;
+            crate::config::backup_settings_json_if_exists(&home, &config.path)?;
             
             println!("\r\nSwitched to Claude configuration: {}", config.name);
             
@@ -53,7 +53,6 @@ async fn launch_claude_with_config(config_path: &PathBuf, config_type: &ConfigTy
     let config: serde_json::Value = serde_json::from_str(&config_content)?;
     
     let mut env_vars = env::vars().collect::<HashMap<String, String>>();
-    
     match config_type {
         ConfigType::Claude => {
             if let Some(env_obj) = config.get("env").and_then(|e| e.as_object()) {
