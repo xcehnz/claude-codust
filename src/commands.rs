@@ -17,6 +17,18 @@ use tokio::process::Command as TokioCommand;
 
 use crate::config::{ConfigItem, ConfigType};
 
+fn cleanup_local_settings() -> Result<()> {
+    let current_dir = std::env::current_dir()?;
+    let local_settings_path = current_dir.join(".claude").join("settings.local.json");
+    
+    if local_settings_path.exists() {
+        fs::remove_file(&local_settings_path)?;
+        println!("\r\nCleaned up local settings file: {}", local_settings_path.display());
+    }
+    
+    Ok(())
+}
+
 pub async fn switch_configuration(config: &ConfigItem) -> Result<()> {
     let home = home_dir().ok_or_else(|| anyhow::anyhow!("Could not find home directory"))?;
     
@@ -116,6 +128,9 @@ async fn launch_claude_with_config(config_path: &PathBuf, config_type: &ConfigTy
         if !status.success() {
             eprintln!("Claude command exited with status: {}", status);
         }
+        
+        // Clean up local settings for Claude configurations
+        let _ = cleanup_local_settings();
     }
     
     println!("\nClaude session completed. Press any key to exit...");
