@@ -75,7 +75,7 @@ fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
     execute!(io::stdout(), crossterm::terminal::Clear(crossterm::terminal::ClearType::FromCursorDown))?;
 
     println!(" Claude Code Configuration Selector");
-    println!(" Use ↑/↓ to navigate, Enter to select, Esc/q to quit");
+    println!(" Use Up/Down to navigate, Enter to select, Esc/q to quit");
     println!();
 
     let max_name_len = configs.iter()
@@ -84,7 +84,7 @@ fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
         .unwrap_or(0);
 
     for (i, config) in configs.iter().enumerate() {
-        let prefix = if i == selected { "❯ " } else { "  " };
+        let prefix = if i == selected { "> " } else { "  " };
         let type_indicator = config.config_type.get_indicator();
         let name_with_indicator = format!("{}{}", config.name, type_indicator);
         println!("{}{:<width$} {}", prefix, name_with_indicator, config.path.display(), width = max_name_len);
