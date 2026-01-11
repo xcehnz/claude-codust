@@ -74,14 +74,14 @@ fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
     execute!(io::stdout(), crossterm::cursor::MoveTo(0, 0))?;
     execute!(io::stdout(), crossterm::terminal::Clear(crossterm::terminal::ClearType::FromCursorDown))?;
 
-    println!("Claude Code Configuration Selector");
-    println!("Use Up/Down to navigate, Enter to select, Esc/q to quit");
-    println!();
+    print!("Claude Code Configuration Selector\r\n");
+    print!("Use Up/Down to navigate, Enter to select, Esc/q to quit\r\n");
+    print!("\r\n");
 
     for (i, config) in configs.iter().enumerate() {
         let prefix = if i == selected { "> " } else { "  " };
         let type_indicator = config.config_type.get_indicator();
-        println!("{}{}{} {}", prefix, config.name, type_indicator, config.path.display());
+        print!("{}{}{} {}\r\n", prefix, config.name, type_indicator, config.path.display());
     }
 
     io::stdout().flush()?;
