@@ -11,17 +11,19 @@ async fn main() -> Result<()> {
         .version(env!("CARGO_PKG_VERSION"))
         .about("Claude Code configuration switcher")
         .arg(
-            Arg::new("code")
-                .help("Show interactive configuration selector")
-                .action(clap::ArgAction::Set)
-                .required(false),
+            Arg::new("config")
+                .short('c')
+                .long("config")
+                .help("Specify configuration file path to launch directly")
+                .value_name("FILE")
+                .action(clap::ArgAction::Set),
         )
         .get_matches();
 
-    if matches.contains_id("code") {
-        ui::show_interactive_selector().await?;
+    if let Some(config_path) = matches.get_one::<String>("config") {
+        commands::launch_with_config_path(config_path).await?;
     } else {
-        println!("Use 'code' to show interactive configuration selector");
+        ui::show_interactive_selector().await?;
     }
 
     Ok(())

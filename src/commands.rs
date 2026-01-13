@@ -17,6 +17,36 @@ use tokio::process::Command as TokioCommand;
 
 use crate::config::{ConfigItem, ConfigType};
 
+pub async fn launch_with_config_path(config_path: &str) -> Result<()> {
+    let path = PathBuf::from(config_path);
+
+    if !path.exists() {
+        anyhow::bail!("Configuration file not found: {}", config_path);
+    }
+
+    let file_name = path.file_name()
+        .and_then(|n| n.to_str())
+        .ok_or_else(|| anyhow::anyhow!("Invalid file name"))?;
+
+    let (name, config_type) = if file_name.ends_with("-settings.json") {
+        (file_name.strip_suffix("-settings.json").unwrap().to_string(), ConfigType::Claude)
+    } else if file_name.ends_with("-config.json") {
+        (file_name.strip_suffix("-config.json").unwrap().to_string(), ConfigType::CodeRouter)
+    } else if file_name == "config.json" {
+        ("config".to_string(), ConfigType::CodeRouter)
+    } else {
+        (file_name.strip_suffix(".json").unwrap_or(file_name).to_string(), ConfigType::Claude)
+    };
+
+    let config_item = ConfigItem {
+        name,
+        path,
+        config_type,
+    };
+
+    switch_configuration(&config_item).await
+}
+
 fn cleanup_local_settings() -> Result<()> {
     let current_dir = std::env::current_dir()?;
     let local_settings_path = current_dir.join(".claude").join("settings.local.json");

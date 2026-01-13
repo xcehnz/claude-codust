@@ -78,10 +78,16 @@ fn print_selector_ui(configs: &[ConfigItem], selected: usize) -> Result<()> {
     print!("Use Up/Down to navigate, Enter to select, Esc/q to quit\r\n");
     print!("\r\n");
 
+    let max_name_len = configs.iter()
+        .map(|c| c.name.len() + c.config_type.get_indicator().len())
+        .max()
+        .unwrap_or(0);
+
     for (i, config) in configs.iter().enumerate() {
         let prefix = if i == selected { "> " } else { "  " };
         let type_indicator = config.config_type.get_indicator();
-        print!("{}{}{} {}\r\n", prefix, config.name, type_indicator, config.path.display());
+        let name_with_indicator = format!("{}{}", config.name, type_indicator);
+        print!("{}{:<width$} {}\r\n", prefix, name_with_indicator, config.path.display(), width = max_name_len);
     }
 
     io::stdout().flush()?;
